@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import axios from "axios";
 
-const API = "http://localhost:3001/api";
+const API = "https://pdv-eventos-backend.onrender.com/api";
 
 // IDs fixos (se no seu banco for diferente, ajuste aqui)
 const BEER_ID = 1;
