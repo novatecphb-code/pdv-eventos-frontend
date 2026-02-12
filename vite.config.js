@@ -1,7 +1,45 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import { VitePWA } from "vite-plugin-pwa";
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
-})
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: "autoUpdate",
+      includeAssets: ["favicon.svg", "favicon.ico", "apple-touch-icon.png"],
+      manifest: {
+        name: "PDV Eventos",
+        short_name: "PDV",
+        description: "PDV simples para eventos",
+        theme_color: "#121212",
+        background_color: "#121212",
+        display: "standalone",
+        scope: "/",
+        start_url: "/",
+        icons: [
+          {
+            src: "/pwa-192.png",
+            sizes: "192x192",
+            type: "image/png"
+          },
+          {
+            src: "/pwa-512.png",
+            sizes: "512x512",
+            type: "image/png"
+          },
+          {
+            src: "/pwa-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any maskable"
+          }
+        ]
+      },
+      workbox: {
+        navigateFallback: "/index.html"
+      }
+    }),
+  ],
+});
+
