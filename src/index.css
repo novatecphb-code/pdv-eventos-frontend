@@ -7,6 +7,7 @@ html, body, #root {
   margin: 0;
   padding: 0;
   height: 100%;
+  width: 100%;
 }
 
 /* TEMA BASE */
@@ -19,9 +20,23 @@ html, body, #root {
 /* BODY AJUSTADO PARA APP */
 body {
   min-height: 100vh;
+  width: 100%;
   background: #121212;
+
+  /* ✅ evita “centralizar” ou sobras estranhas */
+  display: block;
+
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* ✅ melhora touch no celular */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ✅ garante que o app ocupe a tela toda */
+#root {
+  height: 100%;
+  width: 100%;
 }
 
 /* REMOVE ESTILO PADRÃO QUE ATRAPALHA */
@@ -45,4 +60,9 @@ button {
 /* EVITA ZOOM EM INPUT NO IOS */
 input, select {
   font-size: 16px;
+}
+
+/* ✅ evita “puxar” a tela com bounce e scroll lateral */
+body {
+  overscroll-behavior: none;
 }
