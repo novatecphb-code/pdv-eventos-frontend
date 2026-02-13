@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
-const API = "https://pdv-eventos-backend.onrender.com/api";
+// ✅ Na nuvem: configure VITE_API_URL no Render (Static Site)
+// Ex: https://pdv-eventos-backend.onrender.com/api
+// Local: cai no localhost automaticamente
+const API = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 
-// IDs fixos (se no seu banco for diferente, ajuste aqui)
+// IDs fixos (ajuste se seus produtos tiverem outros IDs)
 const BEER_ID = 1;
 const WATER_ID = 2;
 
@@ -13,6 +16,11 @@ function todayISO() {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function getStock(stockArr, productId) {
+  const it = stockArr.find((x) => x.id === productId);
+  return it ? Number(it.stock_now) : 0;
 }
 
 export default function App() {
@@ -44,6 +52,24 @@ export default function App() {
     setStock(data);
   }
 
+  // ✅ Ao abrir o app (celular), recuperar o dia salvo
+  useEffect(() => {
+    const savedId = localStorage.getItem("pdv_day_id");
+    const savedDate = localStorage.getItem("pdv_day_date");
+
+    if (savedId) {
+      const id = Number(savedId);
+      if (id) {
+        setDayId(id);
+        if (savedDate) setDayDate(savedDate);
+        setPayment("CASH");
+        setQty(1);
+        loadStock(id);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function openDay() {
     setMsg("");
     setLoading(true);
@@ -57,6 +83,11 @@ export default function App() {
       });
 
       setDayId(data.event_day_id);
+
+      // ✅ Salvar para continuar após recarregar
+      localStorage.setItem("pdv_day_id", String(data.event_day_id));
+      localStorage.setItem("pdv_day_date", String(dayDate));
+
       await loadStock(data.event_day_id);
 
       // pronto para vender
@@ -96,6 +127,7 @@ export default function App() {
       // pronto pra próxima (mantém pagamento)
       setProductId(null);
       setQty(1);
+
       setMsg("✅ OK");
     } catch (e) {
       setMsg("❌ " + (e.response?.data?.error || e.message));
@@ -113,6 +145,39 @@ export default function App() {
       setShowSummary(true);
     } catch (e) {
       setMsg("❌ " + (e.response?.data?.error || e.message));
+    }
+  }
+
+  // ✅ Fechar dia com confirmação forte
+  async function closeDay() {
+    if (!dayId) return;
+
+    const confirmText = prompt('Para FECHAR o dia, digite: FECHAR');
+    if (confirmText !== "FECHAR") return;
+
+    setMsg("");
+    setLoading(true);
+    try {
+      await axios.post(`${API}/day/${dayId}/close`);
+
+      // limpa estado e storage
+      localStorage.removeItem("pdv_day_id");
+      localStorage.removeItem("pdv_day_date");
+
+      setShowSummary(false);
+      setSummary(null);
+
+      setDayId(null);
+      setStock([]);
+      setProductId(null);
+      setQty(1);
+
+      setMsg("✅ Dia fechado!");
+    } catch (e) {
+      setMsg("❌ " + (e.response?.data?.error || e.message));
+    } finally {
+      setLoading(false);
+      setTimeout(() => setMsg(""), 2000);
     }
   }
 
@@ -192,19 +257,15 @@ export default function App() {
               <div style={styles.stockValue}>{waterStock}</div>
             </div>
 
-            <button
-              style={styles.ghostBtn}
-              onClick={() => {
-                setDayId(null);
-                setProductId(null);
-                setQty(1);
-                setShowSummary(false);
-                setSummary(null);
-              }}
-              disabled={loading}
-            >
-              Trocar dia
-            </button>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button style={styles.ghostBtn} onClick={loadSummary} disabled={loading}>
+                📊 Resumo
+              </button>
+
+              <button style={styles.ghostBtn} onClick={closeDay} disabled={loading}>
+                🔒 Fechar dia
+              </button>
+            </div>
           </div>
 
           <div style={styles.bigGrid}>
@@ -243,18 +304,10 @@ export default function App() {
             <div style={styles.block}>
               <div style={styles.blockTitle}>Quantidade</div>
               <div style={styles.payRow}>
-                <Pill active={qty === 1} onClick={() => setQty(1)}>
-                  1
-                </Pill>
-                <Pill active={qty === 2} onClick={() => setQty(2)}>
-                  2
-                </Pill>
-                <Pill active={qty === 3} onClick={() => setQty(3)}>
-                  3
-                </Pill>
-                <Pill active={qty === 6} onClick={() => setQty(6)}>
-                  6
-                </Pill>
+                <Pill active={qty === 1} onClick={() => setQty(1)}>1</Pill>
+                <Pill active={qty === 2} onClick={() => setQty(2)}>2</Pill>
+                <Pill active={qty === 3} onClick={() => setQty(3)}>3</Pill>
+                <Pill active={qty === 6} onClick={() => setQty(6)}>6</Pill>
               </div>
             </div>
           </div>
@@ -371,18 +424,8 @@ function Item({ label, value, highlight }) {
   );
 }
 
-function getStock(stockArr, productId) {
-  const it = stockArr.find((x) => x.id === productId);
-  return it ? Number(it.stock_now) : 0;
-}
-
 const styles = {
-  page: {
-    background: "#121212",
-    minHeight: "100vh",
-    color: "#fff",
-    padding: 16,
-  },
+  page: { background: "#121212", minHeight: "100vh", color: "#fff", padding: 16 },
 
   header: {
     display: "flex",
@@ -392,7 +435,7 @@ const styles = {
     flexWrap: "wrap",
   },
 
-  title: { fontSize: 44, fontWeight: 900, letterSpacing: -1 },
+  title: { fontSize: 34, fontWeight: 900, letterSpacing: -1 },
   sub: { opacity: 0.8, marginTop: 2 },
 
   rightTop: {
@@ -413,12 +456,7 @@ const styles = {
     whiteSpace: "nowrap",
   },
 
-  msg: {
-    minWidth: 110,
-    textAlign: "right",
-    fontWeight: 800,
-    opacity: 0.95,
-  },
+  msg: { minWidth: 110, textAlign: "right", fontWeight: 800, opacity: 0.95 },
 
   card: {
     marginTop: 16,
@@ -430,7 +468,7 @@ const styles = {
 
   cardTitle: { fontSize: 22, fontWeight: 800, marginBottom: 12 },
 
-  // ✅ RESPONSIVO: no celular vira 1 coluna, no tablet 2, no pc 3
+  // Responsivo (quebra linha no celular)
   grid3: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
@@ -473,7 +511,6 @@ const styles = {
     flexWrap: "wrap",
   },
 
-  // ✅ RESPONSIVO: evita “estourar” no celular
   stockBox: {
     background: "#1a1a1a",
     border: "1px solid #2f2f2f",
@@ -496,7 +533,6 @@ const styles = {
     whiteSpace: "nowrap",
   },
 
-  // ✅ RESPONSIVO: 1 coluna no celular, 2 colunas quando couber
   bigGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -513,7 +549,6 @@ const styles = {
     minHeight: 130,
   },
 
-  // ✅ RESPONSIVO
   row: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
@@ -529,7 +564,6 @@ const styles = {
   },
 
   blockTitle: { fontWeight: 800, marginBottom: 10 },
-
   payRow: { display: "flex", gap: 10, flexWrap: "wrap" },
 
   pill: {
@@ -557,7 +591,6 @@ const styles = {
 
   summaryLine: { marginTop: 10, opacity: 0.85 },
 
-  // Overlay resumo
   overlay: {
     position: "fixed",
     inset: 0,
