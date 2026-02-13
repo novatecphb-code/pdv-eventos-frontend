@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
-// ✅ Na nuvem: configure VITE_API_URL no Render (Static Site)
-// Ex: https://pdv-eventos-backend.onrender.com/api
-// Local: cai no localhost automaticamente
-const API = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 
-// IDs fixos (ajuste se seus produtos tiverem outros IDs)
-const BEER_ID = 1;
-const WATER_ID = 2;
+// Na nuvem: configure VITE_API_URL no Render (Static Site)
+// Ex: https://SEU_BACKEND.onrender.com/api
+const API = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+console.log("API URL:", API);
+
+// IDs fixos
+const BEER_ID = 1;   // Cerveja lata
+const WATER_ID = 2;  // Água
+const STELLA_ID = 3; // Stella Long Neck
 
 function todayISO() {
   const d = new Date();
@@ -30,9 +32,10 @@ export default function App() {
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // abrir dia
+  // abrir dia (estoque inicial)
   const [openBeer, setOpenBeer] = useState(80);
   const [openWater, setOpenWater] = useState(40);
+  const [openStella, setOpenStella] = useState(30);
 
   // venda
   const [productId, setProductId] = useState(null);
@@ -45,6 +48,7 @@ export default function App() {
 
   const beerStock = useMemo(() => getStock(stock, BEER_ID), [stock]);
   const waterStock = useMemo(() => getStock(stock, WATER_ID), [stock]);
+  const stellaStock = useMemo(() => getStock(stock, STELLA_ID), [stock]);
 
   async function loadStock(id = dayId) {
     if (!id) return;
@@ -52,7 +56,7 @@ export default function App() {
     setStock(data);
   }
 
-  // ✅ Ao abrir o app (celular), recuperar o dia salvo
+  // recuperar dia salvo (caso recarregue no celular)
   useEffect(() => {
     const savedId = localStorage.getItem("pdv_day_id");
     const savedDate = localStorage.getItem("pdv_day_date");
@@ -79,18 +83,17 @@ export default function App() {
         opening: [
           { product_id: BEER_ID, qty: Number(openBeer) },
           { product_id: WATER_ID, qty: Number(openWater) },
+          { product_id: STELLA_ID, qty: Number(openStella) },
         ],
       });
 
       setDayId(data.event_day_id);
 
-      // ✅ Salvar para continuar após recarregar
       localStorage.setItem("pdv_day_id", String(data.event_day_id));
       localStorage.setItem("pdv_day_date", String(dayDate));
 
       await loadStock(data.event_day_id);
 
-      // pronto para vender
       setProductId(null);
       setPayment("CASH");
       setQty(1);
@@ -124,10 +127,8 @@ export default function App() {
 
       await loadStock(dayId);
 
-      // pronto pra próxima (mantém pagamento)
       setProductId(null);
       setQty(1);
-
       setMsg("✅ OK");
     } catch (e) {
       setMsg("❌ " + (e.response?.data?.error || e.message));
@@ -148,11 +149,10 @@ export default function App() {
     }
   }
 
-  // ✅ Fechar dia com confirmação forte
   async function closeDay() {
     if (!dayId) return;
 
-    const confirmText = prompt('Para FECHAR o dia, digite: FECHAR');
+    const confirmText = prompt("Para FECHAR o dia, digite: FECHAR");
     if (confirmText !== "FECHAR") return;
 
     setMsg("");
@@ -160,7 +160,6 @@ export default function App() {
     try {
       await axios.post(`${API}/day/${dayId}/close`);
 
-      // limpa estado e storage
       localStorage.removeItem("pdv_day_id");
       localStorage.removeItem("pdv_day_date");
 
@@ -211,29 +210,19 @@ export default function App() {
 
           <div style={styles.grid3}>
             <Field label="Data">
-              <input
-                value={dayDate}
-                onChange={(e) => setDayDate(e.target.value)}
-                style={styles.input}
-              />
+              <input value={dayDate} onChange={(e) => setDayDate(e.target.value)} style={styles.input} />
             </Field>
 
-            <Field label="🍺 Cerveja (inicial)">
-              <input
-                value={openBeer}
-                onChange={(e) => setOpenBeer(e.target.value)}
-                style={styles.input}
-                inputMode="numeric"
-              />
+            <Field label="🍺 Cerveja lata (inicial)">
+              <input value={openBeer} onChange={(e) => setOpenBeer(e.target.value)} style={styles.input} inputMode="numeric" />
             </Field>
 
             <Field label="💧 Água (inicial)">
-              <input
-                value={openWater}
-                onChange={(e) => setOpenWater(e.target.value)}
-                style={styles.input}
-                inputMode="numeric"
-              />
+              <input value={openWater} onChange={(e) => setOpenWater(e.target.value)} style={styles.input} inputMode="numeric" />
+            </Field>
+
+            <Field label="🍺 Stella Long Neck (inicial)">
+              <input value={openStella} onChange={(e) => setOpenStella(e.target.value)} style={styles.input} inputMode="numeric" />
             </Field>
           </div>
 
@@ -248,8 +237,13 @@ export default function App() {
         <div style={styles.pdv}>
           <div style={styles.stockBar}>
             <div style={styles.stockBox}>
-              <div style={styles.stockLabel}>🍺 Cerveja</div>
+              <div style={styles.stockLabel}>🍺 Cerveja lata</div>
               <div style={styles.stockValue}>{beerStock}</div>
+            </div>
+
+            <div style={styles.stockBox}>
+              <div style={styles.stockLabel}>🍺 Stella Long Neck</div>
+              <div style={styles.stockValue}>{stellaStock}</div>
             </div>
 
             <div style={styles.stockBox}>
@@ -273,9 +267,18 @@ export default function App() {
               active={productId === BEER_ID}
               disabled={beerStock <= 0 || loading}
               onClick={() => setProductId(BEER_ID)}
-              title="🍺 Cerveja"
+              title="🍺 Cerveja lata"
               sub="Toque para selecionar"
             />
+
+            <BigChoice
+              active={productId === STELLA_ID}
+              disabled={stellaStock <= 0 || loading}
+              onClick={() => setProductId(STELLA_ID)}
+              title="🍺 Stella Long Neck"
+              sub="Toque para selecionar"
+            />
+
             <BigChoice
               active={productId === WATER_ID}
               disabled={waterStock <= 0 || loading}
@@ -289,15 +292,9 @@ export default function App() {
             <div style={styles.block}>
               <div style={styles.blockTitle}>Pagamento</div>
               <div style={styles.payRow}>
-                <Pill active={payment === "CASH"} onClick={() => setPayment("CASH")}>
-                  Dinheiro
-                </Pill>
-                <Pill active={payment === "PIX"} onClick={() => setPayment("PIX")}>
-                  PIX
-                </Pill>
-                <Pill active={payment === "CARD"} onClick={() => setPayment("CARD")}>
-                  Cartão
-                </Pill>
+                <Pill active={payment === "CASH"} onClick={() => setPayment("CASH")}>Dinheiro</Pill>
+                <Pill active={payment === "PIX"} onClick={() => setPayment("PIX")}>PIX</Pill>
+                <Pill active={payment === "CARD"} onClick={() => setPayment("CARD")}>Cartão</Pill>
               </div>
             </div>
 
@@ -312,18 +309,20 @@ export default function App() {
             </div>
           </div>
 
-          <button
-            style={{ ...styles.finalize, opacity: loading ? 0.6 : 1 }}
-            onClick={finalize}
-            disabled={loading}
-          >
+          <button style={{ ...styles.finalize, opacity: loading ? 0.6 : 1 }} onClick={finalize} disabled={loading}>
             ✅ FINALIZAR VENDA
           </button>
 
           <div style={styles.summaryLine}>
             Produto:{" "}
             <b>
-              {productId === BEER_ID ? "Cerveja" : productId === WATER_ID ? "Água" : "-"}
+              {productId === BEER_ID
+                ? "Cerveja lata"
+                : productId === STELLA_ID
+                ? "Stella Long Neck"
+                : productId === WATER_ID
+                ? "Água"
+                : "-"}
             </b>
             {"  |  "} Pagamento: <b>{payment || "-"}</b>
             {"  |  "} Qtde: <b>{qty}</b>
@@ -385,7 +384,7 @@ function BigChoice({ active, disabled, onClick, title, sub }) {
         cursor: disabled ? "not-allowed" : "pointer",
       }}
     >
-      <div style={{ fontSize: 34, fontWeight: 800 }}>{title}</div>
+      <div style={{ fontSize: 30, fontWeight: 900 }}>{title}</div>
       <div style={{ opacity: 0.8 }}>{sub}</div>
     </button>
   );
@@ -468,10 +467,9 @@ const styles = {
 
   cardTitle: { fontSize: 22, fontWeight: 800, marginBottom: 12 },
 
-  // Responsivo (quebra linha no celular)
   grid3: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
     gap: 12,
   },
 
@@ -541,12 +539,12 @@ const styles = {
   },
 
   bigBtn: {
-    padding: 22,
+    padding: 20,
     borderRadius: 18,
     background: "#1a1a1a",
     color: "#fff",
     textAlign: "left",
-    minHeight: 130,
+    minHeight: 120,
   },
 
   row: {

@@ -10,7 +10,7 @@ export default defineConfig({
       includeAssets: ["favicon.svg", "favicon.ico", "apple-touch-icon.png"],
       manifest: {
         name: "PDV Eventos",
-        short_name: "PDV",
+        short_name: "PDV Vendas",
         description: "PDV simples para eventos",
         theme_color: "#121212",
         background_color: "#121212",
