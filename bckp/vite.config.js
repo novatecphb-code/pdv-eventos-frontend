@@ -18,16 +18,28 @@ export default defineConfig({
         scope: "/",
         start_url: "/",
         icons: [
-          { src: "/pwa-192.png", sizes: "192x192", type: "image/png" },
-          { src: "/pwa-512.png", sizes: "512x512", type: "image/png" },
-          { src: "/pwa-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" }
+          {
+            src: "/pwa-192.png",
+            sizes: "192x192",
+            type: "image/png"
+          },
+          {
+            src: "/pwa-512.png",
+            sizes: "512x512",
+            type: "image/png"
+          },
+          {
+            src: "/pwa-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any maskable"
+          }
         ]
       },
       workbox: {
-        navigateFallback: "/index.html",
-        clientsClaim: true,   // ✅ pega controle na hora
-        skipWaiting: true     // ✅ ativa o SW novo sem esperar
+        navigateFallback: "/index.html"
       }
     }),
   ],
 });
+
