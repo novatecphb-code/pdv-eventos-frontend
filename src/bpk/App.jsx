@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 
-
 // Na nuvem: configure VITE_API_URL no Render (Static Site)
 // Ex: https://SEU_BACKEND.onrender.com/api
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 console.log("API URL:", API);
+
 // IDs fixos
-const BEER_ID = 1;   // Cerveja lata
-const WATER_ID = 2;  // Água
+const BEER_ID = 1; // Cerveja lata
+const WATER_ID = 2; // Água
 const STELLA_ID = 3; // Stella Long Neck
 
 function todayISO() {
@@ -32,9 +32,9 @@ export default function App() {
   const [loading, setLoading] = useState(false);
 
   // abrir dia (estoque inicial)
-  const [openBeer, setOpenBeer] = useState(80);
-  const [openWater, setOpenWater] = useState(40);
-  const [openStella, setOpenStella] = useState(30);
+  const [openBeer, setOpenBeer] = useState(60);
+  const [openWater, setOpenWater] = useState(17);
+  const [openStella, setOpenStella] = useState(6);
 
   // venda
   const [productId, setProductId] = useState(null);
@@ -190,11 +190,19 @@ export default function App() {
         </div>
 
         <div style={styles.rightTop}>
-          <button style={styles.smallBtn} onClick={() => loadStock()} disabled={!dayId || loading}>
+          <button
+            style={styles.smallBtn}
+            onClick={() => loadStock()}
+            disabled={!dayId || loading}
+          >
             ↻ Estoque
           </button>
 
-          <button style={styles.smallBtn} onClick={loadSummary} disabled={!dayId || loading}>
+          <button
+            style={styles.smallBtn}
+            onClick={loadSummary}
+            disabled={!dayId || loading}
+          >
             📊 Resumo
           </button>
 
@@ -209,19 +217,38 @@ export default function App() {
 
           <div style={styles.grid3}>
             <Field label="Data">
-              <input value={dayDate} onChange={(e) => setDayDate(e.target.value)} style={styles.input} />
+              <input
+                value={dayDate}
+                onChange={(e) => setDayDate(e.target.value)}
+                style={styles.input}
+              />
             </Field>
 
             <Field label="🍺 Cerveja lata (inicial)">
-              <input value={openBeer} onChange={(e) => setOpenBeer(e.target.value)} style={styles.input} inputMode="numeric" />
+              <input
+                value={openBeer}
+                onChange={(e) => setOpenBeer(e.target.value)}
+                style={styles.input}
+                inputMode="numeric"
+              />
             </Field>
 
             <Field label="💧 Água (inicial)">
-              <input value={openWater} onChange={(e) => setOpenWater(e.target.value)} style={styles.input} inputMode="numeric" />
+              <input
+                value={openWater}
+                onChange={(e) => setOpenWater(e.target.value)}
+                style={styles.input}
+                inputMode="numeric"
+              />
             </Field>
 
             <Field label="🍺 Stella Long Neck (inicial)">
-              <input value={openStella} onChange={(e) => setOpenStella(e.target.value)} style={styles.input} inputMode="numeric" />
+              <input
+                value={openStella}
+                onChange={(e) => setOpenStella(e.target.value)}
+                style={styles.input}
+                inputMode="numeric"
+              />
             </Field>
           </div>
 
@@ -250,12 +277,21 @@ export default function App() {
               <div style={styles.stockValue}>{waterStock}</div>
             </div>
 
+            {/* Botões rápidos (topo) */}
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button style={styles.ghostBtn} onClick={loadSummary} disabled={loading}>
+              <button
+                style={styles.ghostBtn}
+                onClick={loadSummary}
+                disabled={loading}
+              >
                 📊 Resumo
               </button>
 
-              <button style={styles.ghostBtn} onClick={closeDay} disabled={loading}>
+              <button
+                style={styles.ghostBtn}
+                onClick={closeDay}
+                disabled={loading}
+              >
                 🔒 Fechar dia
               </button>
             </div>
@@ -291,9 +327,15 @@ export default function App() {
             <div style={styles.block}>
               <div style={styles.blockTitle}>Pagamento</div>
               <div style={styles.payRow}>
-                <Pill active={payment === "CASH"} onClick={() => setPayment("CASH")}>Dinheiro</Pill>
-                <Pill active={payment === "PIX"} onClick={() => setPayment("PIX")}>PIX</Pill>
-                <Pill active={payment === "CARD"} onClick={() => setPayment("CARD")}>Cartão</Pill>
+                <Pill active={payment === "CASH"} onClick={() => setPayment("CASH")}>
+                  Dinheiro
+                </Pill>
+                <Pill active={payment === "PIX"} onClick={() => setPayment("PIX")}>
+                  PIX
+                </Pill>
+                <Pill active={payment === "CARD"} onClick={() => setPayment("CARD")}>
+                  Cartão
+                </Pill>
               </div>
             </div>
 
@@ -308,8 +350,21 @@ export default function App() {
             </div>
           </div>
 
-          <button style={{ ...styles.finalize, opacity: loading ? 0.6 : 1 }} onClick={finalize} disabled={loading}>
+          <button
+            style={{ ...styles.finalize, opacity: loading ? 0.6 : 1 }}
+            onClick={finalize}
+            disabled={loading}
+          >
             ✅ FINALIZAR VENDA
+          </button>
+
+          {/* ✅ MELHORIA: Botão grande e sempre visível */}
+          <button
+            style={{ ...styles.closeBig, opacity: loading ? 0.6 : 1 }}
+            onClick={closeDay}
+            disabled={loading}
+          >
+            🔒 FINALIZAR DIA
           </button>
 
           <div style={styles.summaryLine}>
@@ -415,9 +470,7 @@ function Item({ label, value, highlight }) {
       }}
     >
       <div style={{ opacity: 0.8, fontSize: 13 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 900 }}>
-        R$ {Number(value || 0).toFixed(2)}
-      </div>
+      <div style={{ fontSize: 22, fontWeight: 900 }}>R$ {Number(value || 0).toFixed(2)}</div>
     </div>
   );
 }
@@ -583,6 +636,20 @@ const styles = {
     border: "none",
     background: "#fff",
     color: "#000",
+    cursor: "pointer",
+  },
+
+  // ✅ NOVO: botão grande "Finalizar dia" fixo abaixo do finalizar venda
+  closeBig: {
+    marginTop: 10,
+    width: "100%",
+    padding: 16,
+    fontSize: 18,
+    fontWeight: 900,
+    borderRadius: 18,
+    border: "1px solid #3a3a3a",
+    background: "transparent",
+    color: "#fff",
     cursor: "pointer",
   },
 
