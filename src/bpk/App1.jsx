@@ -31,10 +31,10 @@ export default function App() {
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ✅ abrir dia (estoque inicial) - MANUAL de verdade (começa vazio)
-  const [openBeer, setOpenBeer] = useState("");
-  const [openWater, setOpenWater] = useState("");
-  const [openStella, setOpenStella] = useState("");
+  // abrir dia (estoque inicial)
+  const [openBeer, setOpenBeer] = useState(60);
+  const [openWater, setOpenWater] = useState(17);
+  const [openStella, setOpenStella] = useState(6);
 
   // venda
   const [productId, setProductId] = useState(null);
@@ -49,24 +49,13 @@ export default function App() {
   const waterStock = useMemo(() => getStock(stock, WATER_ID), [stock]);
   const stellaStock = useMemo(() => getStock(stock, STELLA_ID), [stock]);
 
-  // ✅ validação simples de abertura (força preencher)
-  const canOpen =
-    /^\d{4}-\d{2}-\d{2}$/.test(dayDate) &&
-    openBeer !== "" &&
-    openWater !== "" &&
-    openStella !== "" &&
-    Number(openBeer) >= 0 &&
-    Number(openWater) >= 0 &&
-    Number(openStella) >= 0 &&
-    !loading;
-
   async function loadStock(id = dayId) {
     if (!id) return;
     const { data } = await axios.get(`${API}/day/${id}/stock`);
     setStock(data);
   }
 
-  // recuperar dia salvo
+  // recuperar dia salvo (caso recarregue no celular)
   useEffect(() => {
     const savedId = localStorage.getItem("pdv_day_id");
     const savedDate = localStorage.getItem("pdv_day_date");
@@ -85,29 +74,6 @@ export default function App() {
   }, []);
 
   async function openDay() {
-    // ✅ trava se não preencher tudo
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayDate)) {
-      setMsg("❌ Data inválida");
-      return;
-    }
-    if ([openBeer, openWater, openStella].some((v) => v === "")) {
-      setMsg("❌ Preencha TODO o estoque inicial");
-      return;
-    }
-    if ([openBeer, openWater, openStella].some((v) => Number(v) < 0 || Number.isNaN(Number(v)))) {
-      setMsg("❌ Estoque inicial inválido");
-      return;
-    }
-
-    // ✅ confirmação antes de abrir (evita erro no corre do evento)
-    const ok = confirm(
-      `Confirmar ABERTURA do dia ${dayDate}?\n\n` +
-        `🍺 Cerveja lata: ${Number(openBeer)}\n` +
-        `💧 Água: ${Number(openWater)}\n` +
-        `🍺 Long Neck: ${Number(openStella)}`
-    );
-    if (!ok) return;
-
     setMsg("");
     setLoading(true);
     try {
@@ -127,15 +93,9 @@ export default function App() {
 
       await loadStock(data.event_day_id);
 
-      // limpa seleção venda
       setProductId(null);
       setPayment("CASH");
       setQty(1);
-
-      // ✅ após abrir, zera campos de abertura (pra não reaproveitar sem querer)
-      setOpenBeer("");
-      setOpenWater("");
-      setOpenStella("");
 
       setMsg(data.already_open ? "✅ Dia já aberto" : "✅ Dia aberto");
     } catch (e) {
@@ -168,7 +128,7 @@ export default function App() {
 
       setProductId(null);
       setQty(1);
-      setMsg("✅ Venda OK");
+      setMsg("✅ OK");
     } catch (e) {
       setMsg("❌ " + (e.response?.data?.error || e.message));
     } finally {
@@ -223,18 +183,26 @@ export default function App() {
     <div style={styles.page}>
       <div style={styles.header}>
         <div style={{ minWidth: 0 }}>
-          <div style={styles.title}>PDV Vendas</div>
+          <div style={styles.title}>PDV</div>
           <div style={styles.sub}>
             {dayId ? `Dia: ${dayDate} (ID ${dayId})` : `Dia: ${dayDate}`}
           </div>
         </div>
 
         <div style={styles.rightTop}>
-          <button style={styles.smallBtn} onClick={() => loadStock()} disabled={!dayId || loading}>
+          <button
+            style={styles.smallBtn}
+            onClick={() => loadStock()}
+            disabled={!dayId || loading}
+          >
             ↻ Estoque
           </button>
 
-          <button style={styles.smallBtn} onClick={loadSummary} disabled={!dayId || loading}>
+          <button
+            style={styles.smallBtn}
+            onClick={loadSummary}
+            disabled={!dayId || loading}
+          >
             📊 Resumo
           </button>
 
@@ -250,7 +218,6 @@ export default function App() {
           <div style={styles.grid3}>
             <Field label="Data">
               <input
-                type="date"
                 value={dayDate}
                 onChange={(e) => setDayDate(e.target.value)}
                 style={styles.input}
@@ -263,7 +230,6 @@ export default function App() {
                 onChange={(e) => setOpenBeer(e.target.value)}
                 style={styles.input}
                 inputMode="numeric"
-                placeholder="Digite..."
               />
             </Field>
 
@@ -273,22 +239,20 @@ export default function App() {
                 onChange={(e) => setOpenWater(e.target.value)}
                 style={styles.input}
                 inputMode="numeric"
-                placeholder="Digite..."
               />
             </Field>
 
-            <Field label="🍺 Long Neck (inicial)">
+            <Field label="🍺 Stella Long Neck (inicial)">
               <input
                 value={openStella}
                 onChange={(e) => setOpenStella(e.target.value)}
                 style={styles.input}
                 inputMode="numeric"
-                placeholder="Digite..."
               />
             </Field>
           </div>
 
-          <button style={{ ...styles.primary, opacity: canOpen ? 1 : 0.5 }} onClick={openDay} disabled={!canOpen}>
+          <button style={styles.primary} onClick={openDay} disabled={loading}>
             ✅ ABRIR DIA
           </button>
 
@@ -304,7 +268,7 @@ export default function App() {
             </div>
 
             <div style={styles.stockBox}>
-              <div style={styles.stockLabel}>🍺 Long Neck</div>
+              <div style={styles.stockLabel}>🍺 Stella Long Neck</div>
               <div style={styles.stockValue}>{stellaStock}</div>
             </div>
 
@@ -313,12 +277,21 @@ export default function App() {
               <div style={styles.stockValue}>{waterStock}</div>
             </div>
 
+            {/* Botões rápidos (topo) */}
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button style={styles.ghostBtn} onClick={loadSummary} disabled={loading}>
+              <button
+                style={styles.ghostBtn}
+                onClick={loadSummary}
+                disabled={loading}
+              >
                 📊 Resumo
               </button>
 
-              <button style={styles.ghostBtn} onClick={closeDay} disabled={loading}>
+              <button
+                style={styles.ghostBtn}
+                onClick={closeDay}
+                disabled={loading}
+              >
                 🔒 Fechar dia
               </button>
             </div>
@@ -337,7 +310,7 @@ export default function App() {
               active={productId === STELLA_ID}
               disabled={stellaStock <= 0 || loading}
               onClick={() => setProductId(STELLA_ID)}
-              title="🍺 Long Neck"
+              title="🍺 Stella Long Neck"
               sub="Toque para selecionar"
             />
 
@@ -354,9 +327,15 @@ export default function App() {
             <div style={styles.block}>
               <div style={styles.blockTitle}>Pagamento</div>
               <div style={styles.payRow}>
-                <Pill active={payment === "CASH"} onClick={() => setPayment("CASH")}>Dinheiro</Pill>
-                <Pill active={payment === "PIX"} onClick={() => setPayment("PIX")}>PIX</Pill>
-                <Pill active={payment === "CARD"} onClick={() => setPayment("CARD")}>Cartão</Pill>
+                <Pill active={payment === "CASH"} onClick={() => setPayment("CASH")}>
+                  Dinheiro
+                </Pill>
+                <Pill active={payment === "PIX"} onClick={() => setPayment("PIX")}>
+                  PIX
+                </Pill>
+                <Pill active={payment === "CARD"} onClick={() => setPayment("CARD")}>
+                  Cartão
+                </Pill>
               </div>
             </div>
 
@@ -371,11 +350,20 @@ export default function App() {
             </div>
           </div>
 
-          <button style={{ ...styles.finalize, opacity: loading ? 0.6 : 1 }} onClick={finalize} disabled={loading}>
+          <button
+            style={{ ...styles.finalize, opacity: loading ? 0.6 : 1 }}
+            onClick={finalize}
+            disabled={loading}
+          >
             ✅ FINALIZAR VENDA
           </button>
 
-          <button style={{ ...styles.closeBig, opacity: loading ? 0.6 : 1 }} onClick={closeDay} disabled={loading}>
+          {/* ✅ MELHORIA: Botão grande e sempre visível */}
+          <button
+            style={{ ...styles.closeBig, opacity: loading ? 0.6 : 1 }}
+            onClick={closeDay}
+            disabled={loading}
+          >
             🔒 FINALIZAR DIA
           </button>
 
@@ -385,7 +373,7 @@ export default function App() {
               {productId === BEER_ID
                 ? "Cerveja lata"
                 : productId === STELLA_ID
-                ? "Long Neck"
+                ? "Stella Long Neck"
                 : productId === WATER_ID
                 ? "Água"
                 : "-"}
@@ -651,6 +639,7 @@ const styles = {
     cursor: "pointer",
   },
 
+  // ✅ NOVO: botão grande "Finalizar dia" fixo abaixo do finalizar venda
   closeBig: {
     marginTop: 10,
     width: "100%",

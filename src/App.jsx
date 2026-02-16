@@ -6,11 +6,6 @@ import axios from "axios";
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 console.log("API URL:", API);
 
-// IDs fixos
-const BEER_ID = 1; // Cerveja lata
-const WATER_ID = 2; // Água
-const STELLA_ID = 3; // Stella Long Neck
-
 function todayISO() {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -20,7 +15,7 @@ function todayISO() {
 }
 
 function getStock(stockArr, productId) {
-  const it = stockArr.find((x) => x.id === productId);
+  const it = stockArr.find((x) => Number(x.id) === Number(productId));
   return it ? Number(it.stock_now) : 0;
 }
 
@@ -31,10 +26,11 @@ export default function App() {
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // ✅ abrir dia (estoque inicial) - MANUAL de verdade (começa vazio)
-  const [openBeer, setOpenBeer] = useState("");
-  const [openWater, setOpenWater] = useState("");
-  const [openStella, setOpenStella] = useState("");
+  // ✅ produtos dinâmicos
+  const [products, setProducts] = useState([]);
+
+  // ✅ abertura dinâmica: { [productId]: "10" }
+  const [opening, setOpening] = useState({});
 
   // venda
   const [productId, setProductId] = useState(null);
@@ -45,29 +41,40 @@ export default function App() {
   const [showSummary, setShowSummary] = useState(false);
   const [summary, setSummary] = useState(null);
 
-  const beerStock = useMemo(() => getStock(stock, BEER_ID), [stock]);
-  const waterStock = useMemo(() => getStock(stock, WATER_ID), [stock]);
-  const stellaStock = useMemo(() => getStock(stock, STELLA_ID), [stock]);
+  const selectedProduct = useMemo(
+    () => products.find((p) => Number(p.id) === Number(productId)) || null,
+    [products, productId]
+  );
 
-  // ✅ validação simples de abertura (força preencher)
-  const canOpen =
-    /^\d{4}-\d{2}-\d{2}$/.test(dayDate) &&
-    openBeer !== "" &&
-    openWater !== "" &&
-    openStella !== "" &&
-    Number(openBeer) >= 0 &&
-    Number(openWater) >= 0 &&
-    Number(openStella) >= 0 &&
-    !loading;
+  // ✅ validação simples de abertura (força preencher todos os produtos)
+  const canOpen = useMemo(() => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dayDate)) return false;
+    if (loading) return false;
+    if (!products.length) return false;
+
+    return products.every((p) => {
+      const v = opening[p.id];
+      if (v === "" || v === undefined) return false;
+      const n = Number(v);
+      return !Number.isNaN(n) && n >= 0;
+    });
+  }, [dayDate, loading, products, opening]);
+
+  async function loadProducts() {
+    const { data } = await axios.get(`${API}/products`);
+    setProducts(data || []);
+  }
 
   async function loadStock(id = dayId) {
     if (!id) return;
     const { data } = await axios.get(`${API}/day/${id}/stock`);
-    setStock(data);
+    setStock(data || []);
   }
 
-  // recuperar dia salvo
+  // recuperar dia salvo + carregar produtos
   useEffect(() => {
+    loadProducts();
+
     const savedId = localStorage.getItem("pdv_day_id");
     const savedDate = localStorage.getItem("pdv_day_date");
 
@@ -85,39 +92,47 @@ export default function App() {
   }, []);
 
   async function openDay() {
-    // ✅ trava se não preencher tudo
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dayDate)) {
       setMsg("❌ Data inválida");
       return;
     }
-    if ([openBeer, openWater, openStella].some((v) => v === "")) {
-      setMsg("❌ Preencha TODO o estoque inicial");
-      return;
-    }
-    if ([openBeer, openWater, openStella].some((v) => Number(v) < 0 || Number.isNaN(Number(v)))) {
-      setMsg("❌ Estoque inicial inválido");
+
+    if (!products.length) {
+      setMsg("❌ Sem produtos cadastrados");
       return;
     }
 
-    // ✅ confirmação antes de abrir (evita erro no corre do evento)
-    const ok = confirm(
-      `Confirmar ABERTURA do dia ${dayDate}?\n\n` +
-        `🍺 Cerveja lata: ${Number(openBeer)}\n` +
-        `💧 Água: ${Number(openWater)}\n` +
-        `🍺 Long Neck: ${Number(openStella)}`
-    );
+    for (const p of products) {
+      const v = opening[p.id];
+      if (v === "" || v === undefined) {
+        setMsg("❌ Preencha TODO o estoque inicial");
+        return;
+      }
+      const n = Number(v);
+      if (Number.isNaN(n) || n < 0) {
+        setMsg("❌ Estoque inicial inválido");
+        return;
+      }
+    }
+
+    const lines = products
+      .map((p) => `• ${p.name}: ${Number(opening[p.id] ?? 0)}`)
+      .join("\n");
+
+    const ok = confirm(`Confirmar ABERTURA do dia ${dayDate}?\n\n${lines}`);
     if (!ok) return;
 
     setMsg("");
     setLoading(true);
     try {
+      const openingArr = products.map((p) => ({
+        product_id: p.id,
+        qty: Number(opening[p.id] ?? 0),
+      }));
+
       const { data } = await axios.post(`${API}/day/open`, {
         day_date: dayDate,
-        opening: [
-          { product_id: BEER_ID, qty: Number(openBeer) },
-          { product_id: WATER_ID, qty: Number(openWater) },
-          { product_id: STELLA_ID, qty: Number(openStella) },
-        ],
+        opening: openingArr,
       });
 
       setDayId(data.event_day_id);
@@ -132,10 +147,8 @@ export default function App() {
       setPayment("CASH");
       setQty(1);
 
-      // ✅ após abrir, zera campos de abertura (pra não reaproveitar sem querer)
-      setOpenBeer("");
-      setOpenWater("");
-      setOpenStella("");
+      // ✅ após abrir, zera campos de abertura
+      setOpening({});
 
       setMsg(data.already_open ? "✅ Dia já aberto" : "✅ Dia aberto");
     } catch (e) {
@@ -238,6 +251,15 @@ export default function App() {
             📊 Resumo
           </button>
 
+          <button
+            style={styles.smallBtn}
+            onClick={loadProducts}
+            disabled={loading}
+            title="Recarregar lista de produtos"
+          >
+            🔄 Produtos
+          </button>
+
           <div style={styles.msg}>{msg}</div>
         </div>
       </div>
@@ -257,61 +279,46 @@ export default function App() {
               />
             </Field>
 
-            <Field label="🍺 Cerveja lata (inicial)">
-              <input
-                value={openBeer}
-                onChange={(e) => setOpenBeer(e.target.value)}
-                style={styles.input}
-                inputMode="numeric"
-                placeholder="Digite..."
-              />
-            </Field>
-
-            <Field label="💧 Água (inicial)">
-              <input
-                value={openWater}
-                onChange={(e) => setOpenWater(e.target.value)}
-                style={styles.input}
-                inputMode="numeric"
-                placeholder="Digite..."
-              />
-            </Field>
-
-            <Field label="🍺 Long Neck (inicial)">
-              <input
-                value={openStella}
-                onChange={(e) => setOpenStella(e.target.value)}
-                style={styles.input}
-                inputMode="numeric"
-                placeholder="Digite..."
-              />
-            </Field>
+            {products.map((p) => (
+              <Field key={p.id} label={`${p.name} (inicial)`}>
+                <input
+                  value={opening[p.id] ?? ""}
+                  onChange={(e) => setOpening((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                  style={styles.input}
+                  inputMode="numeric"
+                  placeholder="Digite..."
+                />
+              </Field>
+            ))}
           </div>
 
-          <button style={{ ...styles.primary, opacity: canOpen ? 1 : 0.5 }} onClick={openDay} disabled={!canOpen}>
+          <button
+            style={{ ...styles.primary, opacity: canOpen ? 1 : 0.5 }}
+            onClick={openDay}
+            disabled={!canOpen}
+          >
             ✅ ABRIR DIA
           </button>
 
-          <div style={styles.hint}>Depois de abrir, você só vende. Simples.</div>
+          <div style={styles.hint}>
+            Depois de abrir, você só vende. Simples.
+            {!products.length ? (
+              <div style={{ marginTop: 8, opacity: 0.85 }}>
+                ⚠️ Nenhum produto carregado. Clique em <b>🔄 Produtos</b> ou confira a API <b>/api/products</b>.
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : (
         // -------- TELA VENDAS --------
         <div style={styles.pdv}>
           <div style={styles.stockBar}>
-            <div style={styles.stockBox}>
-              <div style={styles.stockLabel}>🍺 Cerveja lata</div>
-              <div style={styles.stockValue}>{beerStock}</div>
-            </div>
-
-            <div style={styles.stockBox}>
-              <div style={styles.stockLabel}>🍺 Long Neck</div>
-              <div style={styles.stockValue}>{stellaStock}</div>
-            </div>
-
-            <div style={styles.stockBox}>
-              <div style={styles.stockLabel}>💧 Água</div>
-              <div style={styles.stockValue}>{waterStock}</div>
-            </div>
+            {products.map((p) => (
+              <div key={p.id} style={styles.stockBox}>
+                <div style={styles.stockLabel}>{p.name}</div>
+                <div style={styles.stockValue}>{getStock(stock, p.id)}</div>
+              </div>
+            ))}
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button style={styles.ghostBtn} onClick={loadSummary} disabled={loading}>
@@ -325,71 +332,74 @@ export default function App() {
           </div>
 
           <div style={styles.bigGrid}>
-            <BigChoice
-              active={productId === BEER_ID}
-              disabled={beerStock <= 0 || loading}
-              onClick={() => setProductId(BEER_ID)}
-              title="🍺 Cerveja lata"
-              sub="Toque para selecionar"
-            />
-
-            <BigChoice
-              active={productId === STELLA_ID}
-              disabled={stellaStock <= 0 || loading}
-              onClick={() => setProductId(STELLA_ID)}
-              title="🍺 Long Neck"
-              sub="Toque para selecionar"
-            />
-
-            <BigChoice
-              active={productId === WATER_ID}
-              disabled={waterStock <= 0 || loading}
-              onClick={() => setProductId(WATER_ID)}
-              title="💧 Água"
-              sub="Toque para selecionar"
-            />
+            {products.map((p) => {
+              const available = getStock(stock, p.id);
+              return (
+                <BigChoice
+                  key={p.id}
+                  active={productId === p.id}
+                  disabled={available <= 0 || loading}
+                  onClick={() => setProductId(p.id)}
+                  title={p.name}
+                  sub="Toque para selecionar"
+                />
+              );
+            })}
           </div>
 
           <div style={styles.row}>
             <div style={styles.block}>
               <div style={styles.blockTitle}>Pagamento</div>
               <div style={styles.payRow}>
-                <Pill active={payment === "CASH"} onClick={() => setPayment("CASH")}>Dinheiro</Pill>
-                <Pill active={payment === "PIX"} onClick={() => setPayment("PIX")}>PIX</Pill>
-                <Pill active={payment === "CARD"} onClick={() => setPayment("CARD")}>Cartão</Pill>
+                <Pill active={payment === "CASH"} onClick={() => setPayment("CASH")}>
+                  Dinheiro
+                </Pill>
+                <Pill active={payment === "PIX"} onClick={() => setPayment("PIX")}>
+                  PIX
+                </Pill>
+                <Pill active={payment === "CARD"} onClick={() => setPayment("CARD")}>
+                  Cartão
+                </Pill>
               </div>
             </div>
 
             <div style={styles.block}>
               <div style={styles.blockTitle}>Quantidade</div>
               <div style={styles.payRow}>
-                <Pill active={qty === 1} onClick={() => setQty(1)}>1</Pill>
-                <Pill active={qty === 2} onClick={() => setQty(2)}>2</Pill>
-                <Pill active={qty === 3} onClick={() => setQty(3)}>3</Pill>
-                <Pill active={qty === 6} onClick={() => setQty(6)}>6</Pill>
+                <Pill active={qty === 1} onClick={() => setQty(1)}>
+                  1
+                </Pill>
+                <Pill active={qty === 2} onClick={() => setQty(2)}>
+                  2
+                </Pill>
+                <Pill active={qty === 3} onClick={() => setQty(3)}>
+                  3
+                </Pill>
+                <Pill active={qty === 6} onClick={() => setQty(6)}>
+                  6
+                </Pill>
               </div>
             </div>
           </div>
 
-          <button style={{ ...styles.finalize, opacity: loading ? 0.6 : 1 }} onClick={finalize} disabled={loading}>
+          <button
+            style={{ ...styles.finalize, opacity: loading ? 0.6 : 1 }}
+            onClick={finalize}
+            disabled={loading}
+          >
             ✅ FINALIZAR VENDA
           </button>
 
-          <button style={{ ...styles.closeBig, opacity: loading ? 0.6 : 1 }} onClick={closeDay} disabled={loading}>
+          <button
+            style={{ ...styles.closeBig, opacity: loading ? 0.6 : 1 }}
+            onClick={closeDay}
+            disabled={loading}
+          >
             🔒 FINALIZAR DIA
           </button>
 
           <div style={styles.summaryLine}>
-            Produto:{" "}
-            <b>
-              {productId === BEER_ID
-                ? "Cerveja lata"
-                : productId === STELLA_ID
-                ? "Long Neck"
-                : productId === WATER_ID
-                ? "Água"
-                : "-"}
-            </b>
+            Produto: <b>{selectedProduct ? selectedProduct.name : "-"}</b>
             {"  |  "} Pagamento: <b>{payment || "-"}</b>
             {"  |  "} Qtde: <b>{qty}</b>
           </div>
